@@ -1,0 +1,71 @@
+// Project Structure Guidelines
+
+- Organize the project into the following primary packages:
+  - `com.example.pfe_service.controller`: Contains REST controllers handling HTTP requests and responses.
+  - `com.example.pfe_service.service`: Encapsulates business logic and interacts with repositories.
+  - `com.example.pfe_service.repository`: Interfaces for data access, extending JPA repositories.
+  - `com.example.pfe_service.model`: Entity classes representing database tables.
+  - `com.example.pfe_service.dto`: Data Transfer Objects for transferring data between layers.
+  - `com.example.pfe_service.exception`: Custom exception classes and global exception handlers.
+  - `com.example.pfe_service.config`: Configuration classes for security, CORS, etc.
+
+// Naming Conventions
+
+- Use `PascalCase` for class names (e.g., `StudentProfileController`).
+- Use `camelCase` for method and variable names (e.g., `getStudentProfiles`).
+- Append `Controller` to controller class names, `Service` to service classes, and `Repository` to repository interfaces.
+
+// Controller Layer
+
+- Annotate controller classes with `@RestController` and map requests using `@RequestMapping` or `@GetMapping`, `@PostMapping`, etc.
+- Handle exceptions using `@ExceptionHandler` within controllers or a global exception handler.
+
+// Service Layer
+
+- Annotate service classes with `@Service`.
+- Ensure transactional integrity using `@Transactional` where appropriate.
+- Services should contain business logic and delegate data access to repositories.
+
+// Repository Layer
+
+- Extend `JpaRepository` or `CrudRepository` for data access.
+- Use descriptive method names following Spring Data JPA conventions (e.g., `findByTechnologyName`).
+
+// Entity Classes
+
+- Annotate entity classes with `@Entity` and define primary keys using `@Id`.
+- Use appropriate JPA annotations for relationships (`@OneToMany`, `@ManyToOne`, etc.).
+- Implement `equals` and `hashCode` methods for entity classes.
+
+// DTOs
+
+- Use DTOs to encapsulate data transferred between client and server.
+- Convert entities to DTOs in the service layer or using a dedicated mapper.
+
+// Exception Handling
+
+- Create custom exception classes for specific error cases (e.g., `PfeNotFoundException`).
+- Implement a global exception handler annotated with `@RestControllerAdvice` to manage exceptions uniformly.
+
+// File Handling
+
+- For file uploads (e.g., PFE reports), use `MultipartFile` parameters in controller methods.
+- Store uploaded files securely, and validate file types and sizes to prevent security vulnerabilities.
+
+// AI-Generated Technical Tests
+
+- Integrate with OpenAI's API to generate technical test questions.
+- Ensure that the test generation process considers the student's skills and the company's requirements.
+
+// Dummy Data for Development
+
+- Use dummy IDs (e.g., `1`) for `studentId` and `companyId` during development and testing.
+- Replace dummy data with actual IDs retrieved from the database in the production environment.
+
+// General Best Practices
+
+- Write clean, efficient, and well-documented code.
+- Follow RESTful API design principles for endpoint definitions.
+- Implement input validation to ensure data integrity.
+- Write unit and integration tests to maintain code quality.
+- Use environment variables or configuration files for sensitive information and credentials.
