@@ -51,11 +51,28 @@ public class PfeService implements IPfeService {
         log.info("Fetching Pfe by ID: {}", id);
         Optional<Pfe> pfeOptional = pfeRepository.findById(id);
         if (pfeOptional.isPresent()) {
-            Pfe pfe = pfeOptional.get();
-            if (pfe.getRapportUrl() != null) {
-                String presignedUrl = s3Service.generatePresignedUrl(pfe.getRapportUrl());
+            Pfe originalPfe = pfeOptional.get();
+            
+            // Create a deep copy to avoid modifying the entity that might be managed by JPA
+            Pfe pfe = new Pfe();
+            pfe.setId(originalPfe.getId());
+            pfe.setTitle(originalPfe.getTitle());
+            pfe.setDescription(originalPfe.getDescription());
+            pfe.setGithubUrl(originalPfe.getGithubUrl());
+            pfe.setVideoUrl(originalPfe.getVideoUrl());
+            pfe.setTechnologies(originalPfe.getTechnologies());
+            pfe.setOpenFor(originalPfe.getOpenFor());
+            pfe.setStudentId(originalPfe.getStudentId());
+            pfe.setProcessing(originalPfe.getProcessing());
+            pfe.setCreatedAt(originalPfe.getCreatedAt());
+            pfe.setUpdatedAt(originalPfe.getUpdatedAt());
+            
+            // Generate presigned URL only if rapportUrl exists
+            if (originalPfe.getRapportUrl() != null) {
+                String presignedUrl = s3Service.generatePresignedUrl(originalPfe.getRapportUrl());
                 pfe.setRapportUrl(presignedUrl);
             }
+            
             return pfe;
         } else {
             log.error("Pfe with ID {} not found", id);
@@ -67,24 +84,23 @@ public class PfeService implements IPfeService {
     public List<Pfe> getAllPfe() {
         log.info("Fetching all Pfe records");
         List<Pfe> pfeList = pfeRepository.findAll();
-        return pfeList.stream()
-                .map(pfe -> {
-                    if (pfe.getRapportUrl() != null) {
-                        String presignedUrl = s3Service.generatePresignedUrl(pfe.getRapportUrl());
-                        pfe.setRapportUrl(presignedUrl);
-                    }
-                    return pfe;
-                })
-                .collect(Collectors.toList());
+        return addPresignedUrls(pfeList);
     }
 
     @Override
     public Pfe updatePfe(Pfe pfe) {
         log.info("Updating Pfe: {}", pfe);
         if (pfeRepository.existsById(pfe.getId())) {
+            // Get the existing PFE to preserve the original S3 object key
             Pfe existingPfe = pfeRepository.findById(pfe.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Pfe not found"));
-            pfe.setRapportUrl(existingPfe.getRapportUrl());
+            
+            // Check if the rapportUrl is a presigned URL (starts with https://pidev-2025.s3)
+            if (pfe.getRapportUrl() != null && pfe.getRapportUrl().startsWith("https://pidev-2025.s3")) {
+                // Keep the original S3 object key instead of the presigned URL
+                pfe.setRapportUrl(existingPfe.getRapportUrl());
+            }
+            
             return pfeRepository.save(pfe);
         } else {
             log.error("Pfe with ID {} not found for update", pfe.getId());
@@ -156,11 +172,29 @@ public class PfeService implements IPfeService {
     // Helper method to add presigned URLs to rapport files
     private List<Pfe> addPresignedUrls(List<Pfe> pfeList) {
         return pfeList.stream()
-                .map(pfe -> {
-                    if (pfe.getRapportUrl() != null) {
-                        String presignedUrl = s3Service.generatePresignedUrl(pfe.getRapportUrl());
+                .map(originalPfe -> {
+                    // Create a deep copy to avoid modifying the entity that might be managed by JPA
+                    Pfe pfe = new Pfe();
+                    pfe.setId(originalPfe.getId());
+                    pfe.setTitle(originalPfe.getTitle());
+                    pfe.setDescription(originalPfe.getDescription());
+                    pfe.setGithubUrl(originalPfe.getGithubUrl());
+                    pfe.setVideoUrl(originalPfe.getVideoUrl());
+                    pfe.setTechnologies(originalPfe.getTechnologies());
+                    pfe.setOpenFor(originalPfe.getOpenFor());
+                    pfe.setStudentId(originalPfe.getStudentId());
+                    pfe.setProcessing(originalPfe.getProcessing());
+                    pfe.setCreatedAt(originalPfe.getCreatedAt());
+                    pfe.setUpdatedAt(originalPfe.getUpdatedAt());
+                    
+                    // Generate presigned URL only if rapportUrl exists
+                    if (originalPfe.getRapportUrl() != null) {
+                        String presignedUrl = s3Service.generatePresignedUrl(originalPfe.getRapportUrl());
                         pfe.setRapportUrl(presignedUrl);
+                    } else {
+                        pfe.setRapportUrl(null);
                     }
+                    
                     return pfe;
                 })
                 .collect(Collectors.toList());

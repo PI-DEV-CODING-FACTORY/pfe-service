@@ -1,5 +1,7 @@
 package com.example.pfe_service.controller;
 
+import com.example.pfe_service.dto.TestSubmissionRequest;
+import com.example.pfe_service.entities.Question;
 import com.example.pfe_service.entities.TechnicalTest;
 import com.example.pfe_service.service.ITechnicalTestService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/technical-tests")
 @RequiredArgsConstructor
+@CrossOrigin("*")
 public class TechnicalTestController {
     private final ITechnicalTestService technicalTestService;
 
@@ -37,6 +40,18 @@ public class TechnicalTestController {
     public ResponseEntity<TechnicalTest> getTechnicalTestById(@PathVariable Long id) {
         TechnicalTest technicalTest = technicalTestService.getTechnicalTestById(id);
         return ResponseEntity.ok(technicalTest);
+    }
+
+    @PostMapping("/submit")
+    public ResponseEntity<TechnicalTest> submitTest(@RequestBody TestSubmissionRequest request) {
+        TechnicalTest result = technicalTestService.submitTest(request);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/student/{studentId}")
+    public ResponseEntity<List<TechnicalTest>> getTechnicalTestsByStudentId(@PathVariable String studentId) {
+        List<TechnicalTest> technicalTests = technicalTestService.getTechnicalTestsByStudentId(studentId);
+        return ResponseEntity.ok(technicalTests);
     }
 
     @GetMapping

@@ -1,0 +1,5 @@
+groq:
+  api:
+    key: ${GROQ_API_KEY}  # Set this environment variable with your Groq API key
+
+# ... existing configuration ... 

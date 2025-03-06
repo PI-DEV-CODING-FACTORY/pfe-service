@@ -11,21 +11,26 @@ public class Question {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String text;
     
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String explanation;
     
     private Boolean isMultipleChoice;
     
-    @Column(columnDefinition = "text[]")
+    @Column(columnDefinition = "TEXT[]")
     private String[] options;
     
+    @Column(columnDefinition = "TEXT")
     private String correctAnswer;
+    
+    @Column(columnDefinition = "TEXT")
     private String userAnswer;
+    
     private Boolean isCorrect;
     private Integer points;
+    private String technology;
 
     @ManyToOne
     @JoinColumn(name = "technical_test_id")

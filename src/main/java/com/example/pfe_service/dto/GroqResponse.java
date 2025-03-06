@@ -1,11 +1,13 @@
 package com.example.pfe_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 import java.util.List;
 import java.util.Map;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GroqResponse {
     private String id;
     private String object;
@@ -15,6 +17,7 @@ public class GroqResponse {
     private Usage usage;
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Choice {
         private Integer index;
         private Map<String, String> message;
@@ -22,6 +25,7 @@ public class GroqResponse {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Usage {
         private Integer promptTokens;
         private Integer completionTokens;

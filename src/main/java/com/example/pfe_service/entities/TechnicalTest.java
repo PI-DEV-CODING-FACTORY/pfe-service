@@ -2,6 +2,7 @@ package com.example.pfe_service.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,6 +24,9 @@ public class TechnicalTest {
     
     private LocalDateTime createdAt;
     private LocalDateTime deadline;
+    private LocalDateTime finishedAt;
+    private Duration timeSpent; // Time taken to complete the test
+    private Boolean cheated;
     private Boolean isCompleted;
     private Integer score;
     
@@ -45,5 +49,6 @@ public class TechnicalTest {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        cheated = false;
     }
 }

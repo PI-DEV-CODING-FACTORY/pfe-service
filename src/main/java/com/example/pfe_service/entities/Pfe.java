@@ -23,13 +23,13 @@ public class Pfe {
     @Column(columnDefinition = "TEXT")
     private String description;
     
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String rapportUrl;
     
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String githubUrl;
     
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String videoUrl;
     
     private Boolean processing;

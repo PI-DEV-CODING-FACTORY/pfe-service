@@ -1,6 +1,7 @@
 package com.example.pfe_service.config;
 
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,25 +13,24 @@ public class GroqConfig {
     @Value("${groq.api.key}")
     private String apiKey;
 
-    @Value("${groq.api.url:https://api.groq.com/v1}")
-    private String apiUrl;
-
     @Bean
-    public OkHttpClient okHttpClient() {
-        return new OkHttpClient.Builder()
-                .addInterceptor(chain -> chain.proceed(
-                        chain.request().newBuilder()
-                                .addHeader("Authorization", "Bearer " + apiKey)
-                                .build()))
-                .build();
-    }
+    public Retrofit groqRetrofit() {
+        OkHttpClient client = new OkHttpClient.Builder()
+            .addInterceptor(chain -> {
+                Request original = chain.request();
+                Request request = original.newBuilder()
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .method(original.method(), original.body())
+                    .build();
+                return chain.proceed(request);
+            })
+            .build();
 
-    @Bean
-    public Retrofit retrofit(OkHttpClient okHttpClient) {
         return new Retrofit.Builder()
-                .baseUrl(apiUrl)
-                .client(okHttpClient)
-                .addConverterFactory(JacksonConverterFactory.create())
-                .build();
+            .baseUrl("https://api.groq.com/openai/v1/")
+            .client(client)
+            .addConverterFactory(JacksonConverterFactory.create())
+            .build();
     }
 } 

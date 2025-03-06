@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -39,7 +40,7 @@ public class ProposalService implements IProposalService {
         proposal.setCreatedAt(LocalDateTime.now());
         proposal.setMessage(request.getMessage());
 
-        return proposalRepository.save(proposal);
+        return cleanProposal(proposalRepository.save(proposal));
     }
 
     @Override
@@ -95,12 +96,36 @@ public class ProposalService implements IProposalService {
 
     @Override
     public Proposal getProposalById(Long id) {
-        return proposalRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Proposal not found with id: " + id));
+        return cleanProposal(proposalRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Proposal not found with id: " + id)));
     }
 
     @Override
     public List<Proposal> getAllProposals() {
-        return proposalRepository.findAll();
+        return proposalRepository.findAll().stream()
+                .map(this::cleanProposal)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Proposal> getProposalsByStudentId(String studentId) {
+        log.info("Fetching proposals for student ID: {}", studentId);
+        return proposalRepository.findByStudentId(studentId).stream()
+                .map(this::cleanProposal)
+                .collect(Collectors.toList());
+    }
+
+    // Helper method to clean proposal data before returning
+    private Proposal cleanProposal(Proposal originalProposal) {
+        Proposal proposal = new Proposal();
+        proposal.setId(originalProposal.getId());
+        proposal.setStudentId(originalProposal.getStudentId());
+        proposal.setCompanyId(originalProposal.getCompanyId());
+        proposal.setPfe(originalProposal.getPfe());
+        proposal.setStatus(originalProposal.getStatus());
+        proposal.setCreatedAt(originalProposal.getCreatedAt());
+        proposal.setRespondedAt(originalProposal.getRespondedAt());
+        proposal.setMessage(originalProposal.getMessage());
+        return proposal;
     }
 }

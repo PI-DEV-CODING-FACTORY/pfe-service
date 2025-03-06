@@ -12,4 +12,5 @@ public interface IProposalService {
     void deleteProposal(Long id);
     Proposal getProposalById(Long id);
     List<Proposal> getAllProposals();
+    List<Proposal> getProposalsByStudentId(String studentId);
 }

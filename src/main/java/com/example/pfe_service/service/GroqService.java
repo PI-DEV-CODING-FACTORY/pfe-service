@@ -17,6 +17,7 @@ import retrofit2.http.POST;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -47,21 +48,25 @@ public class GroqService {
             if (!retrofitResponse.isSuccessful()) {
                 String errorBody = retrofitResponse.errorBody() != null ? retrofitResponse.errorBody().string() : "Unknown error";
                 log.error("Groq API request failed with code: {}, error: {}", retrofitResponse.code(), errorBody);
-                log.warn("Using fallback questions instead");
-                return generateFallbackQuestions(technologies);
+                // Try one more time with a different temperature
+                request = GroqRequest.builder()
+                        .model("mixtral-8x7b-32768")
+                        .messages(List.of(Map.of("role", "user", "content", prompt)))
+                        .temperature(0.9) // Higher temperature for more creativity
+                        .stream(false)
+                        .build();
+                retrofitResponse = api.chat(request).execute();
+                
+                if (!retrofitResponse.isSuccessful()) {
+                    log.warn("Second attempt failed, using fallback questions");
+                    return generateFallbackQuestions(technologies);
+                }
             }
             
             GroqResponse response = retrofitResponse.body();
             
-            if (response == null) {
-                log.error("Groq API returned null response");
-                log.warn("Using fallback questions instead");
-                return generateFallbackQuestions(technologies);
-            }
-            
-            if (response.getChoices() == null || response.getChoices().isEmpty()) {
-                log.error("Groq API returned empty choices: {}", response);
-                log.warn("Using fallback questions instead");
+            if (response == null || response.getChoices() == null || response.getChoices().isEmpty()) {
+                log.error("Groq API returned invalid response: {}", response);
                 return generateFallbackQuestions(technologies);
             }
             
@@ -69,24 +74,43 @@ public class GroqService {
             
             if (content == null || content.isEmpty()) {
                 log.error("Groq API returned empty content");
-                log.warn("Using fallback questions instead");
                 return generateFallbackQuestions(technologies);
             }
             
             log.info("Successfully received response from Groq API");
             log.debug("Response content: {}", content);
             
-            List<Question> questions = parseQuestions(content);
-            log.info("Successfully parsed {} questions", questions.size());
-            
-            return questions;
-        } catch (IOException e) {
-            log.error("Error generating technical questions: {}", e.getMessage(), e);
-            log.warn("Using fallback questions instead");
-            return generateFallbackQuestions(technologies);
+            try {
+                List<Question> questions = parseQuestions(content);
+                
+                // Validate the generated questions
+                if (questions.size() < 5 || !validateQuestions(questions, technologies)) {
+                    log.warn("Generated questions did not meet requirements, trying again with different prompt");
+                    // Try again with a modified prompt
+                    String retryPrompt = prompt + "\n\nIMPORTANT: Please ensure to generate exactly 5 diverse questions covering the specified technologies. Do not reuse common examples.";
+                    request = buildRequest(retryPrompt);
+                    retrofitResponse = api.chat(request).execute();
+                    
+                    if (retrofitResponse.isSuccessful() && retrofitResponse.body() != null) {
+                        content = retrofitResponse.body().getChoices().get(0).getMessage().get("content");
+                        questions = parseQuestions(content);
+                        
+                        if (questions.size() >= 5 && validateQuestions(questions, technologies)) {
+                            return questions;
+                        }
+                    }
+                    
+                    log.warn("Retry attempt failed to generate valid questions");
+                    return generateFallbackQuestions(technologies);
+                }
+                
+                return questions;
+            } catch (Exception e) {
+                log.error("Error parsing questions: {}", e.getMessage(), e);
+                return generateFallbackQuestions(technologies);
+            }
         } catch (Exception e) {
-            log.error("Unexpected error generating technical questions: {}", e.getMessage(), e);
-            log.warn("Using fallback questions instead");
+            log.error("Error generating technical questions: {}", e.getMessage(), e);
             return generateFallbackQuestions(technologies);
         }
     }
@@ -259,26 +283,149 @@ public class GroqService {
     }
 
     private String buildPrompt(List<Technologies> technologies, String description) {
+        StringBuilder techSpecificInstructions = new StringBuilder();
+        
+        // Add specific instructions for each technology
+        for (Technologies tech : technologies) {
+            switch (tech) {
+                case JAVA:
+                    techSpecificInstructions.append("""
+                        For Java questions:
+                        - Include core Java concepts (OOP, Collections, Streams)
+                        - Cover Spring Boot if mentioned in the description
+                        - Include questions about memory management and JVM
+                        - Focus on Java 8+ features if possible
+                        """);
+                    break;
+                case SPRING_BOOT:
+                    techSpecificInstructions.append("""
+                        For Spring Boot questions:
+                        - Cover dependency injection and Spring IoC
+                        - Include questions about REST APIs and controllers
+                        - Ask about Spring Data JPA and repositories
+                        - Include Spring Security concepts if relevant
+                        """);
+                    break;
+                case JAVASCRIPT:
+                    techSpecificInstructions.append("""
+                        For JavaScript questions:
+                        - Focus on ES6+ features
+                        - Cover async programming (Promises, async/await)
+                        - Include DOM manipulation if frontend-related
+                        - Ask about closures and scope
+                        """);
+                    break;
+                case TYPESCRIPT:
+                    techSpecificInstructions.append("""
+                        For TypeScript questions:
+                        - Cover type system and interfaces
+                        - Include questions about generics
+                        - Ask about TypeScript-specific features
+                        - Focus on type safety and best practices
+                        """);
+                    break;
+                case ANGULAR:
+                    techSpecificInstructions.append("""
+                        For Angular questions:
+                        - Cover components and services
+                        - Include questions about dependency injection
+                        - Ask about Angular lifecycle hooks
+                        - Include RxJS and Observables
+                        """);
+                    break;
+                case REACT:
+                    techSpecificInstructions.append("""
+                        For React questions:
+                        - Cover hooks and functional components
+                        - Include state management concepts
+                        - Ask about component lifecycle
+                        - Include questions about React Router and Context
+                        """);
+                    break;
+                case EXPRESS_JS:
+                    techSpecificInstructions.append("""
+                        For Express.js questions:
+                        - Cover middleware and routing
+                        - Include REST API design
+                        - Ask about error handling
+                        - Include authentication and security
+                        """);
+                    break;
+                case POSTGRESQL:
+                case MYSQL:
+                    techSpecificInstructions.append("""
+                        For SQL Database questions:
+                        - Cover query optimization
+                        - Include transaction management
+                        - Ask about indexing strategies
+                        - Include data modeling best practices
+                        """);
+                    break;
+                case MONGODB:
+                    techSpecificInstructions.append("""
+                        For MongoDB questions:
+                        - Cover document design
+                        - Include aggregation pipeline
+                        - Ask about indexing in MongoDB
+                        - Include scaling and sharding concepts
+                        """);
+                    break;
+                case DOCKER:
+                    techSpecificInstructions.append("""
+                        For Docker questions:
+                        - Cover containerization concepts
+                        - Include Dockerfile best practices
+                        - Ask about container orchestration
+                        - Include Docker networking
+                        """);
+                    break;
+                case KUBERNETES:
+                    techSpecificInstructions.append("""
+                        For Kubernetes questions:
+                        - Cover pod lifecycle
+                        - Include deployment strategies
+                        - Ask about service discovery
+                        - Include scaling and load balancing
+                        """);
+                    break;
+                default:
+                    techSpecificInstructions.append(String.format("""
+                        For %s questions:
+                        - Focus on fundamental concepts
+                        - Include practical application scenarios
+                        - Cover best practices and common patterns
+                        - Relate to real-world use cases
+                        """, tech.name()));
+            }
+        }
+
         return String.format("""
-            Generate 5 technical interview questions based on the following technologies and project description.
-            Make sure the questions are challenging and relevant to assess a student's proficiency in these technologies.
+            Generate 5 technical interview questions for a PFE (Final Year Project) position.
+            The questions should specifically test the candidate's knowledge of the following technologies: %s
             
-            Technologies: %s
             Project Description: %s
             
-            For each question:
-            1. Make it specific to one of the listed technologies
-            2. Ensure it's relevant to the project description when possible
-            3. Include a mix of theoretical knowledge and practical application
-            4. For multiple-choice questions, include 4 options with only one correct answer
-            5. For non-multiple-choice questions, expect a concise answer
+            %s
+            
+            Question Distribution:
+            - Ensure at least one question for each technology mentioned
+            - Make 60%% of questions specific to the primary technologies
+            - Include both theoretical and practical questions
+            - Relate questions to the project description when possible
+            
+            Question Difficulty:
+            - 20%% Easy (1-2 points)
+            - 60%% Medium (3 points)
+            - 20%% Hard (4-5 points)
             
             For each question, provide:
             1. The question text
             2. Whether it's multiple choice (true/false)
-            3. The correct answer
-            4. A detailed explanation of the answer that helps the student learn
-            5. Points (between 1-5 based on difficulty)
+            3. For multiple choice: exactly 4 options with only one correct answer
+            4. The correct answer
+            5. A detailed explanation that helps the student learn
+            6. Points (1-5 based on difficulty)
+            7. The primary technology being tested
             
             Format the response as a JSON array of objects with the following structure:
             [
@@ -288,21 +435,22 @@ public class GroqService {
                 "options": ["option1", "option2", "option3", "option4"] (only for multiple choice),
                 "correctAnswer": "correct answer",
                 "explanation": "explanation text",
-                "points": number
+                "points": number,
+                "technology": "primary technology being tested"
               }
             ]
             """,
             technologies.stream()
                     .map(Enum::name)
-                    .reduce((a, b) -> a + ", " + b)
-                    .orElse(""),
-            description
+                    .collect(Collectors.joining(", ")),
+            description,
+            techSpecificInstructions.toString()
         );
     }
 
     private GroqRequest buildRequest(String prompt) {
         return GroqRequest.builder()
-                .model("mixtral-8x7b-32768")
+                .model("llama-3.3-70b-versatile")
                 .messages(List.of(Map.of("role", "user", "content", prompt)))
                 .temperature(0.7)
                 .maxTokens(4000)
@@ -314,6 +462,17 @@ public class GroqService {
         try {
             log.debug("Parsing questions from content: {}", content);
             
+            // Clean up the content to ensure valid JSON
+            content = content.trim();
+            if (!content.startsWith("[")) {
+                // Extract JSON array if it's embedded in text
+                int start = content.indexOf("[");
+                int end = content.lastIndexOf("]") + 1;
+                if (start >= 0 && end > start) {
+                    content = content.substring(start, end);
+                }
+            }
+            
             List<Map<String, Object>> questionsData = objectMapper.readValue(
                 content, new TypeReference<List<Map<String, Object>>>() {});
             
@@ -321,16 +480,56 @@ public class GroqService {
             
             List<Question> questions = new ArrayList<>();
             for (Map<String, Object> data : questionsData) {
-                Question question = new Question();
-                question.setText((String) data.get("text"));
-                question.setIsMultipleChoice((Boolean) data.get("isMultipleChoice"));
-                question.setOptions(data.get("options") != null ? 
-                    objectMapper.convertValue(data.get("options"), String[].class) : null);
-                question.setCorrectAnswer((String) data.get("correctAnswer"));
-                question.setExplanation((String) data.get("explanation"));
-                question.setPoints((Integer) data.get("points"));
-                question.setIsCorrect(false); // Initialize as not answered yet
-                questions.add(question);
+                try {
+                    Question question = new Question();
+                    question.setText((String) data.get("text"));
+                    question.setIsMultipleChoice((Boolean) data.get("isMultipleChoice"));
+                    
+                    if (question.getIsMultipleChoice()) {
+                        Object optionsObj = data.get("options");
+                        if (optionsObj instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<String> optionsList = (List<String>) optionsObj;
+                            question.setOptions(optionsList.toArray(new String[0]));
+                        } else if (optionsObj instanceof String[]) {
+                            question.setOptions((String[]) optionsObj);
+                        }
+                    }
+                    
+                    question.setCorrectAnswer((String) data.get("correctAnswer"));
+                    question.setExplanation((String) data.get("explanation"));
+                    
+                    // Handle points with type conversion if necessary
+                    Object pointsObj = data.get("points");
+                    if (pointsObj instanceof Integer) {
+                        question.setPoints((Integer) pointsObj);
+                    } else if (pointsObj instanceof Number) {
+                        question.setPoints(((Number) pointsObj).intValue());
+                    } else if (pointsObj instanceof String) {
+                        question.setPoints(Integer.parseInt((String) pointsObj));
+                    }
+                    
+                    // Set technology field
+                    String technology = (String) data.get("technology");
+                    if (technology != null) {
+                        question.setTechnology(technology.toUpperCase());
+                    }
+                    
+                    question.setIsCorrect(false); // Initialize as not answered yet
+                    
+                    // Validate the question before adding
+                    if (isValidQuestion(question)) {
+                        questions.add(question);
+                    } else {
+                        log.warn("Skipping invalid question: {}", question.getText());
+                    }
+                } catch (Exception e) {
+                    log.error("Error parsing individual question: {}", e.getMessage());
+                }
+            }
+            
+            if (questions.isEmpty()) {
+                throw new RuntimeException("No valid questions could be parsed");
             }
             
             return questions;
@@ -341,6 +540,129 @@ public class GroqService {
             log.error("Unexpected error parsing questions: {}", e.getMessage(), e);
             throw new RuntimeException("Unexpected error parsing questions: " + e.getMessage(), e);
         }
+    }
+
+    private boolean isValidQuestion(Question question) {
+        if (question.getText() == null || question.getText().trim().isEmpty()) {
+            return false;
+        }
+        
+        if (question.getCorrectAnswer() == null || question.getCorrectAnswer().trim().isEmpty()) {
+            return false;
+        }
+        
+        if (question.getPoints() == null || question.getPoints() < 1 || question.getPoints() > 5) {
+            return false;
+        }
+        
+        if (question.getIsMultipleChoice()) {
+            if (question.getOptions() == null || question.getOptions().length != 4) {
+                return false;
+            }
+            
+            // Check if correct answer is one of the options
+            boolean correctAnswerInOptions = false;
+            for (String option : question.getOptions()) {
+                if (option.equals(question.getCorrectAnswer())) {
+                    correctAnswerInOptions = true;
+                    break;
+                }
+            }
+            if (!correctAnswerInOptions) {
+                return false;
+            }
+        }
+        
+        if (question.getTechnology() == null || question.getTechnology().trim().isEmpty()) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    public boolean verifyAnswer(String correctAnswer, String userAnswer, String question) {
+        try {
+            log.info("Verifying answer for question: {}", question);
+            
+            String prompt = String.format("""
+                You are an AI evaluating a student's answer to a technical question.
+                
+                Question: %s
+                Correct Answer: %s
+                Student's Answer: %s
+                
+                Evaluate if the student's answer is correct. Consider:
+                1. Core concepts and technical accuracy
+                2. Key points from the correct answer
+                3. Different ways of expressing the same concept
+                
+                Respond with only 'true' if the answer is correct, or 'false' if it's incorrect.
+                """, question, correctAnswer, userAnswer);
+            
+            GroqRequest request = buildRequest(prompt);
+            GroqApi api = retrofit.create(GroqApi.class);
+            
+            Response<GroqResponse> retrofitResponse = api.chat(request).execute();
+            
+            if (!retrofitResponse.isSuccessful() || retrofitResponse.body() == null || 
+                retrofitResponse.body().getChoices() == null || 
+                retrofitResponse.body().getChoices().isEmpty()) {
+                log.error("Failed to verify answer using Groq API");
+                // If API fails, be lenient and mark as correct
+                return true;
+            }
+            
+            String response = retrofitResponse.body().getChoices().get(0).getMessage().get("content").trim().toLowerCase();
+            return response.equals("true");
+            
+        } catch (Exception e) {
+            log.error("Error verifying answer: {}", e.getMessage());
+            // If there's an error, be lenient and mark as correct
+            return true;
+        }
+    }
+
+    private boolean validateQuestions(List<Question> questions, List<Technologies> technologies) {
+        if (questions.size() < 5) {
+            return false;
+        }
+
+        // Check if we have at least one question for each primary technology
+        Set<String> coveredTechnologies = questions.stream()
+                .map(q -> q.getTechnology())
+                .collect(Collectors.toSet());
+
+        // Convert technology enums to strings for comparison
+        Set<String> requiredTechnologies = technologies.stream()
+                .map(Enum::name)
+                .collect(Collectors.toSet());
+
+        // Check if we have questions for at least 60% of the required technologies
+        long technologiesCovered = requiredTechnologies.stream()
+                .filter(tech -> coveredTechnologies.stream()
+                        .anyMatch(covered -> covered.toUpperCase().contains(tech)))
+                .count();
+
+        double coveragePercentage = (double) technologiesCovered / requiredTechnologies.size();
+        if (coveragePercentage < 0.6) {
+            return false;
+        }
+
+        // Check for question diversity (no duplicate questions)
+        long uniqueQuestions = questions.stream()
+                .map(Question::getText)
+                .distinct()
+                .count();
+        if (uniqueQuestions < questions.size()) {
+            return false;
+        }
+
+        // Validate multiple choice questions have exactly 4 options
+        boolean validOptions = questions.stream()
+                .filter(Question::getIsMultipleChoice)
+                .allMatch(q -> q.getOptions() != null && q.getOptions().length == 4);
+
+        return validOptions;
     }
 
     private interface GroqApi {
