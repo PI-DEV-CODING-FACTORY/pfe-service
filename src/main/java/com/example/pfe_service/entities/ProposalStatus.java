@@ -7,4 +7,6 @@ public enum ProposalStatus {
     PASSED,
     FAILED,
     MEETING_SCHEDULED,
+    STUDENT_ACCEPTED,
+    STUDENT_REJECTED,
 } 

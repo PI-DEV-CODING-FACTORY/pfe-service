@@ -13,4 +13,5 @@ public interface IProposalService {
     Proposal getProposalById(Long id);
     List<Proposal> getAllProposals();
     List<Proposal> getProposalsByStudentId(String studentId);
+    List<Proposal> getProposalsByCompanyId(String companyId);
 }

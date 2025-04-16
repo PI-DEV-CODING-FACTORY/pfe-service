@@ -82,6 +82,12 @@ public class ProposalController {
         return ResponseEntity.ok(proposals);
     }
 
+    @GetMapping("/company/{companyId}")
+    public ResponseEntity<List<Proposal>> getProposalsByCompanyId(@PathVariable String companyId) {
+        List<Proposal> proposals = proposalService.getProposalsByCompanyId(companyId);
+        return ResponseEntity.ok(proposals);
+    }
+
     @GetMapping
     public ResponseEntity<List<Proposal>> getAllProposals() {
         return ResponseEntity.ok(proposalService.getAllProposals());

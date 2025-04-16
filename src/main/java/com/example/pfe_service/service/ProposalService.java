@@ -115,6 +115,14 @@ public class ProposalService implements IProposalService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<Proposal> getProposalsByCompanyId(String companyId) {
+        log.info("Fetching proposals for company ID: {}", companyId);
+        return proposalRepository.findByCompanyId(companyId).stream()
+                .map(this::cleanProposal)
+                .collect(Collectors.toList());
+    }
+
     // Helper method to clean proposal data before returning
     private Proposal cleanProposal(Proposal originalProposal) {
         Proposal proposal = new Proposal();

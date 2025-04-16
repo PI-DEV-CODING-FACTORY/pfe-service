@@ -5,6 +5,7 @@ import com.example.pfe_service.repository.TechnicalTestRepository;
 import com.example.pfe_service.entities.TechnicalTest;
 import com.example.pfe_service.entities.Question;
 import com.example.pfe_service.entities.Proposal;
+import com.example.pfe_service.entities.ProposalStatus;
 import com.example.pfe_service.entities.Technologies;
 import com.example.pfe_service.dto.TestSubmissionRequest;
 import lombok.RequiredArgsConstructor;
@@ -309,6 +310,22 @@ public class TechnicalTestService implements ITechnicalTestService {
             // Calculate final score as a percentage
             int finalScore = totalPoints > 0 ? (totalScore * 100) / totalPoints : 0;
             technicalTest.setScore(finalScore);
+            
+            // Update proposal status based on test score
+            // Pass if score is 50% or higher
+            Proposal proposal = technicalTest.getProposal();
+            if (proposal != null) {
+                if (finalScore >= 50) {
+                    proposal.setStatus(ProposalStatus.PASSED);
+                    log.info("Student passed the technical test with score {}%. Updating proposal status to PASSED", finalScore);
+                } else {
+                    proposal.setStatus(ProposalStatus.FAILED);
+                    log.info("Student failed the technical test with score {}%. Updating proposal status to FAILED", finalScore);
+                }
+                proposalRepository.save(proposal);
+            } else {
+                log.warn("No proposal associated with technical test ID: {}", technicalTest.getId());
+            }
             
             TechnicalTest savedTest = technicalTestRepository.save(technicalTest);
             return getTechnicalTestById(savedTest.getId());

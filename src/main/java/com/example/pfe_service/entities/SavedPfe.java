@@ -1,6 +1,7 @@
 package com.example.pfe_service.entities;
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -16,4 +17,11 @@ public class SavedPfe {
     private Pfe pfe;
 
     private String companyId; // Keycloak user ID for Company
+
+    private LocalDateTime savedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        savedAt = LocalDateTime.now();
+    }
 }
