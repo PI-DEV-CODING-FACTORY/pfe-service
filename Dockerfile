@@ -1,5 +1,5 @@
 # Build stage
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+FROM --platform=linux/amd64 maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Create Maven settings with multiple mirrors
@@ -38,7 +38,14 @@ RUN --mount=type=cache,target=/root/.m2/repository \
      mvn clean package -DskipTests)
 
 # Run stage
-FROM eclipse-temurin:21-jre-jammy
+FROM --platform=linux/amd64 eclipse-temurin:21-jre-jammy
+LABEL org.opencontainers.image.title="PFE Service"
+LABEL org.opencontainers.image.description="A Spring Boot service for managing PFE (Projet de Fin d'Études) applications"
+LABEL org.opencontainers.image.authors="Your Name <your.email@example.com>"
+LABEL org.opencontainers.image.source="https://github.com/yourusername/pfe-service"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.platform="linux/amd64"
+
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
